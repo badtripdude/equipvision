@@ -16,3 +16,4 @@ rapidocr-onnxruntime
 reportlab
 httpx  # only for the API tests
 pypdfium2
+vosk

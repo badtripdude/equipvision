@@ -1238,6 +1238,99 @@ function drawTrainingHint(ctx, w, h) {
   ctx.fillText(`Ищите: ${step.what[0].toLowerCase()}`, 20, 64, w - 40);
 }
 
+// ---------- choosing a unit by voice ----------
+
+const VOICE_SECONDS = 3.5;
+let listening = false;
+
+/** The microphone; with a development test source, a tone that only exercises the path. */
+async function micStream() {
+  if (TEST_SOURCE) {
+    const ctx = new AudioContext();
+    const tone = ctx.createOscillator();
+    const out = ctx.createMediaStreamDestination();
+    tone.connect(out);
+    tone.start();
+    return out.stream;
+  }
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error(window.isSecureContext ? 'Этот браузер не даёт доступ к микрофону.'
+      : 'Микрофон доступен только по HTTPS. Откройте адрес сервера, начинающийся с https://');
+  }
+  return navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+}
+
+/** Records a few seconds and returns 16-bit mono samples with their sample rate. */
+async function recordPhrase() {
+  const stream = await micStream();
+  let ctx;
+  try {
+    ctx = new AudioContext({ sampleRate: 16000 });      // what the recogniser works at
+  } catch {
+    ctx = new AudioContext();                           // the server is told the real rate
+  }
+  const source = ctx.createMediaStreamSource(stream);
+  const tap = ctx.createScriptProcessor(4096, 1, 1);
+  const chunks = [];
+  tap.onaudioprocess = (event) => chunks.push(new Float32Array(event.inputBuffer.getChannelData(0)));
+  source.connect(tap);
+  tap.connect(ctx.destination);
+  await new Promise((resolve) => setTimeout(resolve, VOICE_SECONDS * 1000));
+  tap.disconnect();
+  source.disconnect();
+  for (const track of stream.getTracks()) track.stop();
+  const rate = ctx.sampleRate;
+  await ctx.close();
+
+  const pcm = new Int16Array(chunks.reduce((n, chunk) => n + chunk.length, 0));
+  let offset = 0;
+  for (const chunk of chunks) {
+    for (const value of chunk) pcm[offset++] = Math.max(-1, Math.min(1, value)) * 32767;
+  }
+  return { pcm, rate };
+}
+
+async function listen() {
+  if (listening) return;
+  listening = true;
+  const button = $('voice-button'), status = $('voice-status'), box = $('voice-candidates');
+  button.disabled = true;
+  button.classList.add('listening');
+  box.replaceChildren();
+  try {
+    status.textContent = 'Слушаю… назовите агрегат, например: «насос сто один».';
+    const { pcm, rate } = await recordPhrase();
+    button.classList.remove('listening');
+    status.textContent = 'Распознаю…';
+    const res = await fetch(`/api/voice?rate=${rate}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: pcm.buffer });
+    const answer = await res.json();
+    if (!res.ok) throw new Error(typeof answer.detail === 'string' ? answer.detail : 'Не удалось распознать речь');
+
+    if (answer.match) {
+      status.textContent = `Услышано: «${answer.text}».`;
+      await openEquipment(answer.match.id);
+      snack(`Агрегат выбран голосом: ${answer.match.id}`);
+    } else if (answer.candidates.length) {
+      // Heard unclearly, or the phrase fits several units: the engineer confirms.
+      status.textContent = `Услышано: «${answer.text}». Подтвердите выбор:`;
+      for (const unit of answer.candidates) box.append(unitItem(unit, 'Выбрать этот агрегат'));
+    } else {
+      status.textContent = answer.text
+        ? `Услышано: «${answer.text}». Не удалось понять, какой это агрегат — повторите или выберите из списка.`
+        : 'Ничего не разобрал. Скажите, например: «насос сто один».';
+    }
+  } catch (err) {
+    status.textContent = err.name === 'NotAllowedError'
+      ? 'Доступ к микрофону запрещён. Разрешите его в настройках сайта.' : err.message;
+  } finally {
+    listening = false;
+    button.disabled = false;
+    button.classList.remove('listening');
+  }
+}
+$('voice-button').addEventListener('click', listen);
+
 // ---------- sign-in and users ----------
 
 async function loadUsers() {

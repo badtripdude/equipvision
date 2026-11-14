@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 import base64
 
-from . import auth, db, documents, identify, inspection, photos, report, rules, training
+from . import auth, db, documents, identify, inspection, photos, report, rules, training, voice
 from .config import CLIENT_DIR, ROOT_DIR, SERVER_DIR
 from .inspection import SIGNS, FrameTracker
 from .telemetry import Replayer, find_episodes
@@ -25,6 +25,7 @@ MAX_FRAME_BYTES = 2_000_000
 replayer: Replayer
 detector: Detector
 reader = identify.FrameReader()
+listener = voice.Recogniser()
 
 
 @asynccontextmanager
@@ -237,6 +238,25 @@ async def identify_frame(request: Request):
         match, candidates = identify.match_serial(lines, units)
         by = "serial" if match else None
     return {"match": match, "by": by, "candidates": candidates, "qr": payload, "texts": lines[:8],
+            "ms": round((time.perf_counter() - started) * 1000)}
+
+
+@app.post("/api/voice")
+async def identify_voice(request: Request, rate: int = voice.RATE):
+    """A short phrase as raw 16-bit mono audio in the body -> the unit that was named."""
+    if not listener.available:
+        raise HTTPException(503, "Модель распознавания речи не установлена: запустите tools/fetch_model.py")
+    data = await request.body()
+    if not 8000 <= rate <= 48000 or len(data) < rate // 2 or len(data) > 12 * rate * 2:
+        raise HTTPException(400, "Нужна запись длиной от четверти секунды до 12 секунд")
+    started = time.perf_counter()
+    words = await asyncio.to_thread(listener.words, data, rate)
+    text = " ".join(word for word, _ in words)
+    match, candidates = voice.match_text(text, db.list_equipment())
+    confident = voice.sure(words)
+    if match and not confident:                      # heard something, but not clearly enough to act on it
+        match, candidates = None, [match]
+    return {"text": text, "match": match, "candidates": candidates, "confident": confident,
             "ms": round((time.perf_counter() - started) * 1000)}
 
 

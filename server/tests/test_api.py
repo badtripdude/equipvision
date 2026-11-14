@@ -229,6 +229,17 @@ class Api(unittest.TestCase):
         self.assertEqual({r["username"] for r in engineer.get("/api/training").json()}, {"engineer"})
         self.assertGreaterEqual(len(self.client("master").get("/api/training").json()), 3)           # the mentor sees all
 
+    def test_voice_endpoint(self):
+        from app import voice
+        engineer = self.client("engineer")
+        self.assertEqual(self.client().post("/api/voice", content=bytes(32000)).status_code, 401)
+        if not voice.Recogniser().available:
+            self.assertEqual(engineer.post("/api/voice", content=bytes(32000)).status_code, 503)
+            return
+        self.assertEqual(engineer.post("/api/voice", content=b"short").status_code, 400)
+        silence = engineer.post("/api/voice", content=bytes(32000)).json()               # one second of silence
+        self.assertEqual((silence["text"], silence["match"], silence["candidates"]), ("", None, []))
+
     def test_note_starting_with_equals_is_not_a_formula(self):
         engineer = self.client("engineer")
         engineer.post("/api/equipment/PCP-3/events", json={"kind": "inspection", "note": "=1+1"})

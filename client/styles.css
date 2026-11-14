@@ -459,3 +459,11 @@ details[open] > summary::after { transform: rotate(180deg); }
   .stop { grid-template-columns: 40px minmax(0, 1fr); }
   .stop > .btn { grid-column: 2; justify-self: start; margin: -6px 0 6px; }
 }
+
+/* ---------- voice ---------- */
+
+.voice { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.voice p { flex: 1; min-width: 180px; }
+.btn.listening { background: var(--md-error-container); color: var(--md-on-error-container); animation: pulse 1.2s infinite; }
+@keyframes pulse { 50% { opacity: .6; } }
+@media (prefers-reduced-motion: reduce) { .btn.listening { animation: none; } }

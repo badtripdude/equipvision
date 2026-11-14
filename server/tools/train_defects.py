@@ -9,13 +9,15 @@ Data
     nothing         pages of the customer's documents (tools/build_no_defect.py), with --docs
     oil leaks       photos of power transformers with boxes (tools/fetch_transformer.py, Zenodo 22771088,
                     CC BY 4.0), with --transformer; its val and test parts are never trained on
+    everyday scenes rooms, desks, laptops, people — nothing to find there (tools/fetch_scenes.py, COCO val2017,
+                    freely licensed photos only), with --scenes; its test part is never trained on
 
 Measurement
     corrosion       trained on the Ostrava train part, scored on its untouched test part
     leak, overheat  leave-one-scene-out: each scene of the customer's photos is predicted by a head
                     that never saw it (duplicates of a photo share a scene)
-    false alarms    Ostrava validation + test photos (no leaks or burn marks there) and the test
-                    documents (nothing at all there)
+    false alarms    Ostrava validation + test photos (no leaks or burn marks there), the test
+                    documents and the test everyday scenes (nothing at all there)
     new photos      val + test parts of the transformer set: leaks found, false alarms on photos
                     without a leak. --no-extra-train leaves its train part out, to see what it adds.
 
@@ -48,6 +50,7 @@ OSTRAVA = ROOT / "datasets" / "ostrava"
 NO_DEFECT = ROOT / "datasets" / "no_defect"
 TRANSFORMER = ROOT / "datasets" / "transformer"
 ANNOTATIONS = SERVER / "training" / "annotations.json"
+SCENES = ROOT / "datasets" / "scenes"
 CACHE = ROOT / "tmp" / "feat-cache"
 OUT = SERVER / "models" / "defect-head"
 
@@ -58,6 +61,8 @@ IGNORE = -1.0
 # Augmented views per photo, plus the whole one. Sources not listed are only evaluated, never trained on.
 VIEWS = {"customer": 12, "ostrava_train": 4, "ostrava_validation": 0, "docs_train": 2, "tr_train": 1}
 CACHE_VERSION = 5
+# Everyday scenes are cached apart from the rest, so adding them does not recompute the other features.
+SCENE_VIEWS = {"scenes_train": 3}
 
 
 # ---------- views and labels ----------
@@ -103,6 +108,33 @@ def make_view(image: Image.Image, rng: random.Random, p_capture: float):
     if rng.random() < 0.3:
         view = view.filter(ImageFilter.GaussianBlur(rng.uniform(0.5, 1.5)))
     return view, to_image
+
+
+def scene_view(image: Image.Image, rng: random.Random, _p_capture: float = 0.0):
+    """A view of an everyday photo as a phone would show it: any crop, often dark, tinted or smeared by motion."""
+    import cv2
+
+    w, h = image.size
+    scale = rng.uniform(0.3, 1.0)
+    cw, ch = w * scale, h * scale * rng.uniform(0.6, 1.0)
+    left, top = rng.uniform(0, w - cw), rng.uniform(0, h - ch)
+    view = image.crop((round(left), round(top), round(left + cw), round(top + ch))).resize((SIDE, SIDE), Image.BILINEAR)
+    if rng.random() < 0.5:
+        view = ImageOps.mirror(view)
+    view = ImageEnhance.Brightness(view).enhance(rng.uniform(0.12, 0.6) if rng.random() < 0.5 else rng.uniform(0.6, 1.3))
+    view = ImageEnhance.Contrast(view).enhance(rng.uniform(0.6, 1.3))
+    pixels = np.asarray(view).astype(np.float32)
+    if rng.random() < 0.4:                                       # coloured light: a backlit keyboard, a screen glow
+        pixels *= np.array([rng.uniform(0.6, 1.4), rng.uniform(0.6, 1.2), rng.uniform(0.6, 1.4)], dtype=np.float32)
+    if rng.random() < 0.4:                                       # the hand moved
+        length = rng.choice([7, 11, 15, 21])
+        kernel = np.zeros((length, length), dtype=np.float32)
+        if rng.random() < 0.5:
+            kernel[length // 2, :] = 1.0 / length
+        else:
+            kernel[:, length // 2] = 1.0 / length
+        pixels = cv2.filter2D(pixels, -1, kernel)
+    return Image.fromarray(pixels.clip(0, 255).astype(np.uint8)), identity
 
 
 def labels_from_boxes(boxes: list[dict], mapper, gh: int = GRID, gw: int = GRID) -> np.ndarray:
@@ -198,10 +230,12 @@ def extract(items, backbone, p_capture: float, seed: int) -> None:
     for item in items:
         image = item["image"]
         views = []
-        if item["source"] in VIEWS:
+        counts = {**VIEWS, **SCENE_VIEWS}
+        if item["source"] in counts:
             capture_share = 0.0 if item["source"].startswith("docs") else p_capture
+            make = scene_view if item["source"].startswith("scenes") else make_view
             views = [(image.resize((SIDE, SIDE), Image.BILINEAR), identity)]
-            views += [make_view(image, rng, capture_share) for _ in range(VIEWS[item["source"]])]
+            views += [make(image, rng, capture_share) for _ in range(counts[item["source"]])]
         if views:
             feats = torch.cat([patch_features(backbone, to_batch([v for v, _ in views[i:i + 16]])).cpu()
                                for i in range(0, len(views), 16)])
@@ -222,18 +256,47 @@ def load_or_extract(args) -> list[dict]:
                       hashlib.md5(ANNOTATIONS.read_bytes()).hexdigest()], sort_keys=True)
     path = CACHE / f"{hashlib.md5(key.encode()).hexdigest()[:12]}.pt"
     if path.exists():
-        return split_new(torch.load(path, weights_only=False))
+        items = torch.load(path, weights_only=False)
+    else:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        backbone = load_backbone(SERVER / "models" / args.backbone, device)
+        items = load_items(args.docs, args.transformer)
+        extract(items, backbone, args.capture, args.data_seed)
+        for item in items:
+            del item["image"], item["label"]
+        CACHE.mkdir(parents=True, exist_ok=True)
+        torch.save(items, path)
+        del backbone
+        torch.cuda.empty_cache()
+    if args.scenes:
+        items += scene_items(args)
+    return split_new(items)
+
+
+def scene_items(args) -> list[dict]:
+    """Everyday photos with nothing to find, with their own cache file."""
+    files = [(split, path) for split in ("train", "test") for path in sorted((SCENES / split).glob("*.jpg"))]
+    if not any(split == "test" for split, _ in files):
+        raise SystemExit("No everyday scenes: run tools/fetch_scenes.py first")
+    key = json.dumps([CACHE_VERSION, args.backbone, args.data_seed, SIDE, LONGS, SCENE_VIEWS,
+                      [f"{split}/{path.name}" for split, path in files]], sort_keys=True)
+    path = CACHE / f"scenes-{hashlib.md5(key.encode()).hexdigest()[:12]}.pt"
+    if path.exists():
+        return torch.load(path, weights_only=False)
+    items = []
+    for split, file in files:
+        image = ImageOps.exif_transpose(Image.open(file)).convert("RGB")
+        items.append({"name": f"scenes/{split}/{file.name}", "group": f"scenes_{split}_{file.stem}",
+                      "source": f"scenes_{split}", "image": image, "boxes": [], "label": labels_nothing})
     device = "cuda" if torch.cuda.is_available() else "cpu"
     backbone = load_backbone(SERVER / "models" / args.backbone, device)
-    items = load_items(args.docs, args.transformer)
-    extract(items, backbone, args.capture, args.data_seed)
+    extract(items, backbone, 0.0, args.data_seed + 1000)
     for item in items:
         del item["image"], item["label"]
-    CACHE.mkdir(parents=True, exist_ok=True)
     torch.save(items, path)
     del backbone
     torch.cuda.empty_cache()
-    return split_new(items)
+    return items
 
 
 def split_new(items: list[dict]) -> list[dict]:
@@ -360,11 +423,11 @@ def evaluate(bank: Bank, refine: bool, epochs: int, seed: int, extra_train: bool
     items = bank.items
     by_source = lambda *sources: [i for i, item in enumerate(items) if item["source"] in sources]
     customer = by_source("customer")
-    base = by_source("ostrava_train", "docs_train", *(("tr_train",) if extra_train else ()))
+    base = by_source("ostrava_train", "docs_train", "scenes_train", *(("tr_train",) if extra_train else ()))
     out = {}
 
     head = fit(bank, customer + base, refine, epochs, seed)
-    for i in by_source("ostrava_validation", "ostrava_test", "docs_test", "tr_val", "tr_test"):
+    for i in by_source("ostrava_validation", "ostrava_test", "docs_test", "scenes_test", "tr_val", "tr_test"):
         out[items[i]["name"]] = {long: logits(head, items[i], long, bank.device) for long in LONGS}
     if True:
         for group in sorted({items[i]["group"] for i in customer}):
@@ -394,7 +457,8 @@ def summarise(items: list[dict], maps: dict, long: int, thresholds: dict) -> dic
                                          "false_images": f"{sum(n['false'] for n in negative)}/{len(negative)}",
                                          "patch_ap": round(average_precision(z[y != IGNORE], y[y != IGNORE]), 3)}
 
-    for label, sources in (("ostrava_no_leak_or_burn", ("ostrava_validation", "ostrava_test")), ("documents", ("docs_test",))):
+    for label, sources in (("ostrava_no_leak_or_burn", ("ostrava_validation", "ostrava_test")), ("documents", ("docs_test",)),
+                           ("everyday_scenes", ("scenes_test",))):
         names = [n for n in scored if source[n] in sources]
         if names:
             signs = SIGNS[1:] if label.startswith("ostrava") else SIGNS
@@ -451,6 +515,7 @@ def main() -> None:
     parser.add_argument("--capture", type=float, default=0.0)
     parser.add_argument("--docs", action="store_true")
     parser.add_argument("--transformer", action="store_true", help="use the transformer oil-leak photos")
+    parser.add_argument("--scenes", action="store_true", help="use everyday photos with nothing to find (tools/fetch_scenes.py)")
     parser.add_argument("--no-extra-train", action="store_true", help="keep their train part out of training")
     parser.add_argument("--data-seed", type=int, default=0)
     parser.add_argument("--refine", default="0", help="comma list of 0/1")
@@ -487,14 +552,14 @@ def main() -> None:
     if args.save:
         refine, seed, maps = first
         # Everything except the two untouched test parts.
-        held_out = ("ostrava_test", "docs_test", "tr_val", "tr_test") + (("tr_train",) if args.no_extra_train else ())
+        held_out = ("ostrava_test", "docs_test", "scenes_test", "tr_val", "tr_test") + (("tr_train",) if args.no_extra_train else ())
         final_ids = [i for i, item in enumerate(items) if item["source"] not in held_out]
         head = fit(bank, final_ids, refine, args.epochs, seed)
         OUT.mkdir(parents=True, exist_ok=True)
         torch.save(head.state_dict(), OUT / "head.pt")
         meta = {"backbone": args.backbone, "dim": bank.dim, "signs": SIGNS, "thresholds": thresholds,
                 "long_side": args.long, "calibration": calibration(items, maps, args.long),
-                "training": {"capture": args.capture, "docs": args.docs, "transformer": args.transformer,
+                "training": {"capture": args.capture, "docs": args.docs, "transformer": args.transformer, "scenes": args.scenes,
                              "refine": int(refine), "seed": seed,
                              "epochs": args.epochs},
                 "measured": summarise(items, maps, args.long, thresholds)}

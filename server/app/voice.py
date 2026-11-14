@@ -27,7 +27,10 @@ ORDINALS = {"первый": 1, "второй": 2, "третий": 3, "четвё
 # Words that say what kind of unit is meant -> a fragment of the unit name in the database.
 KINDS = {"центробежный": "центробежн", "винтовой": "винтов", "одновинтовой": "винтов"}
 FILLERS = ["насос", "агрегат", "номер", "позиция"]
-VOCABULARY = [*FILLERS, *KINDS, *UNITS, *TEENS, *TENS, *HUNDREDS, *ORDINALS]
+# Words the recogniser listens for; the two left out are not in the model's dictionary.
+VOCABULARY = [w for w in (*FILLERS, *KINDS, *UNITS, *TEENS, *TENS, *HUNDREDS, *ORDINALS)
+              if w not in ("одновинтовой", "четвертый")]
+MIN_CONFIDENCE = 0.7
 
 
 def spoken_number(words: list[str]) -> int | None:
@@ -77,7 +80,8 @@ class Recogniser:
     def available(self) -> bool:
         return (MODEL_DIR / "am").exists()
 
-    def text(self, pcm: bytes, rate: int = RATE) -> str:
+    def words(self, pcm: bytes, rate: int = RATE) -> list[tuple[str, float]]:
+        """Recognised words with the engine's confidence in each."""
         from vosk import KaldiRecognizer, Model, SetLogLevel
 
         with self._lock:
@@ -85,6 +89,19 @@ class Recogniser:
                 SetLogLevel(-1)
                 self._model = Model(str(MODEL_DIR))
             recogniser = KaldiRecognizer(self._model, rate, json.dumps([" ".join(VOCABULARY), "[unk]"], ensure_ascii=False))
+            recogniser.SetWords(True)
             recogniser.AcceptWaveform(pcm)
-            words = json.loads(recogniser.FinalResult()).get("text", "")
-        return " ".join(w for w in words.split() if w != "[unk]")
+            result = json.loads(recogniser.FinalResult()).get("result", [])
+        return [(item["word"], float(item["conf"])) for item in result if item["word"] != "[unk]"]
+
+
+def sure(words: list[tuple[str, float]]) -> bool:
+    """Whether the phrase is clear enough to open the unit without asking.
+
+    With a small vocabulary any noise is heard as some word, so a lone word is never trusted:
+    the phrase must have a number and a word saying it is about a unit, each heard clearly.
+    """
+    said = [w for w, _ in words]
+    about_unit = any(w in FILLERS or w in KINDS for w in said)
+    return (about_unit and spoken_number(said) is not None
+            and min((conf for _, conf in words), default=0.0) >= MIN_CONFIDENCE)
