@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#ecedf4" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#1d2024" media="(prefers-color-scheme: dark)">
   <title>EquipVision</title>
@@ -117,6 +117,7 @@
               <svg class="icon"><use href="#i-camera"/></svg>Включить камеру
             </button>
           </div>
+          <button id="shutter" class="shutter" type="button" aria-label="Сфотографировать дефект" title="Сфотографировать дефект" data-mode="inspect"></button>
           <div class="stage-foot">
             <span id="verdict" class="chip status">ожидание кадра</span>
             <span id="stats" class="chip quiet" hidden></span>
@@ -250,17 +251,13 @@
               <button id="work-replacement" class="btn tonal" type="button"><svg class="icon"><use href="#i-swap"/></svg>Выбранный узел заменён</button>
             </div>
           </details>
-          <details class="card flush">
-            <summary>Что система сейчас не оценивает</summary>
-            <ul id="not-covered" class="plain-list"></ul>
-          </details>
         </section>
 
         <!-- telemetry -->
         <section class="tab-panel" aria-label="Датчики" data-mode="inspect" data-tab="sensors">
           <div id="tm-none" class="banner info" hidden>
             <svg class="icon"><use href="#i-info"/></svg>
-            <div>К этому агрегату телеметрия не подключена: оценка только по осмотру и наработке.</div>
+            <div>Состояние этого агрегата оценивается по осмотру и наработке.</div>
           </div>
           <div id="tm-live" class="stack">
             <div class="card-head" style="margin: 0">

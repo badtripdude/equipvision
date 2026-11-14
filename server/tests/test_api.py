@@ -1,4 +1,5 @@
 """Sign-in, roles and reports through the HTTP API, on a throwaway database and the stub detector."""
+import base64
 import io
 import json
 import os
@@ -129,7 +130,7 @@ class Api(unittest.TestCase):
         self.assertEqual(self.client().get("/api/equipment/PCP-3/documents").status_code, 401)
 
         demo = engineer.get("/api/equipment/P-101/documents").json()
-        self.assertIn("Паспорта на этот агрегат", demo["note"])                                     # said openly
+        self.assertIn("каталога производителя", demo["note"])
 
     def rusty_frame(self) -> bytes:
         """A frame the stub detector calls corrosion."""
@@ -205,6 +206,18 @@ class Api(unittest.TestCase):
         engineer.post("/api/equipment/PCP-3/findings", json={**ref, "note": "всё-таки есть"})      # by hand it comes back
         self.assertEqual(len(engineer.get("/api/equipment/PCP-3/diagnosis").json()["findings"]), 1)
         engineer.post("/api/equipment/PCP-3/inspection/reset")
+
+    def test_shutter_photo_becomes_a_finding_with_a_picture(self):
+        engineer = self.client("engineer")
+        engineer.post("/api/equipment/PCP-4/inspection/reset")
+        frame = base64.b64encode(self.rusty_frame()).decode()
+        answer = engineer.post("/api/equipment/PCP-4/findings", json={"component": "frame", "sign": "photo", "frame": frame})
+        self.assertEqual(answer.status_code, 201)
+        finding = answer.json()["findings"][0]
+        self.assertEqual((finding["sign"], finding["sign_title"], finding["source"]), ("photo", "дефект (фото)", "manual"))
+        self.assertEqual(engineer.get(f"/api/photos/{finding['photo']}").status_code, 200)
+        self.assertNotIn("not_covered", answer.json())
+        engineer.post("/api/equipment/PCP-4/inspection/reset")
 
     def test_round_tracks_inspected_and_skipped_units(self):
         engineer = self.client("engineer")

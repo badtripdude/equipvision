@@ -129,7 +129,7 @@ def component_resource(component: dict, equipment_hours: float) -> dict:
     norm = component["norm_hours"]
     if norm is None:
         return {"used_hours": used, "remaining_hours": None, "status": "unknown",
-                "note": "Норматив по наработке не задан: оценка только по состоянию"}
+                "note": "Оценивается по состоянию при осмотре"}
     remaining = norm - used
     if remaining <= 0:
         status = "alarm"

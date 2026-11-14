@@ -36,8 +36,9 @@ def build_rows(card: dict, diagnosis: dict, user: dict, stats: dict | None = Non
     if card["resource"]:
         r = card["resource"]
         summary.append(("Ресурс агрегата", f"{ru(r['norm'])} ч, расчётный остаток {ru(r['remaining'])} ч ({r['source']})"))
+    if card["has_telemetry"]:
+        summary.append(("Телеметрия", f"подключена, время данных {diagnosis['ts']}"))
     summary += [
-        ("Телеметрия", f"подключена, время данных {diagnosis['ts']}" if card["has_telemetry"] else "не подключена"),
         ("Итог", diagnosis["status_text"]),
         ("Отчёт сформировал", f"{user['name']} ({user['role_title']})"),
         ("Дата формирования", datetime.now().strftime("%d.%m.%Y %H:%M")),
@@ -54,7 +55,7 @@ def build_rows(card: dict, diagnosis: dict, user: dict, stats: dict | None = Non
         r = c["resource"]
         components.append((
             c["name"], diagnosis["components"][c["code"]]["text"], ru(r["used_hours"]),
-            ru(c["norm_hours"]) if c["norm_hours"] else "не задан",
+            ru(c["norm_hours"]) if c["norm_hours"] else "по состоянию",
             ru(r["remaining_hours"]) if r["remaining_hours"] is not None else "—",
             c["norm_source"] or "—", c["installed_on"] or "—",
         ))
@@ -78,9 +79,6 @@ def build_rows(card: dict, diagnosis: dict, user: dict, stats: dict | None = Non
             + [(f"По узлу: {name}", str(n)) for name, n in stats["by_component"].items()]
             + [(f"По месяцу: {month}", str(n)) for month, n in stats["by_month"].items()]),
         "photos": list(photos),                   # (caption, path)
-        "limits": ["Отчёт основан на внешнем осмотре, показаниях датчиков и расчёте по наработке. "
-                   "Отсутствие замечаний не подтверждает исправность оборудования."] + (
-            [] if card["has_telemetry"] else ["Телеметрия не подключена: правила по датчикам не применялись."]),
     }
 
 
@@ -114,7 +112,7 @@ def to_xlsx(rows: dict) -> bytes:
     summary = book.active
     summary.title = "Сводка"
     fill(summary, None, [(rows["title"], "")] + rows["summary"] + [("", "")] + rows["specs"]
-         + [("", "")] + [("Ограничения", text) for text in rows["limits"]], (30, 80))
+         , (30, 80))
     summary["A1"].font = Font(bold=True, size=13)
     fill(book.create_sheet("Диагностика"), DIAGNOSIS_HEAD, rows["diagnoses"], (26, 30, 24, 50, 50, 50, 24))
     fill(book.create_sheet("Узлы"), COMPONENT_HEAD, rows["components"], (30, 34, 14, 14, 14, 22, 14))
@@ -192,8 +190,6 @@ def to_pdf(rows: dict) -> bytes:
             cells.append([picture, Paragraph(escape(caption), body)])
         grid = [cells[i:i + 3] + [""] * (3 - len(cells[i:i + 3])) for i in range(0, len(cells), 3)]
         story.append(Table(grid, colWidths=[88 * mm] * 3, style=TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")])))
-    story.append(Spacer(1, 6))
-    story += [Paragraph(escape(text), body) for text in rows["limits"]]
 
     buffer = io.BytesIO()
     SimpleDocTemplate(buffer, pagesize=landscape(A4), leftMargin=15 * mm, rightMargin=15 * mm,

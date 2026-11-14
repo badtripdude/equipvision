@@ -264,16 +264,6 @@ RULES = [
     ),
 ]
 
-# Customer examples that cannot be evaluated: the data has no such channels and the
-# camera has no such detector. Shown to the user instead of silently skipping them.
-NOT_COVERED = [
-    "Кавитация: нет давления на входе в насос.",
-    "Износ проточной части: нет расхода и напора для расчёта КПД.",
-    "Дисбаланс токов по фазам: нет токов двигателя.",
-    "Расхождение манометра и датчика: нет датчика давления и чтения стрелочного прибора.",
-    "Деградация масла: смотровое стекло камерой не распознаётся.",
-]
-
 
 def _worst(levels) -> str:
     return max(levels, key=STATUS_ORDER.get, default="ok")
@@ -428,10 +418,9 @@ def evaluate(ctx: Context) -> dict:
         "status": status,
         "status_text": (LEVEL_TEXT[status] if diagnoses or ctx.inspected
                         else "Осмотр не начат, отклонений по датчикам нет" if ctx.values
-                        else "Осмотр не начат, телеметрия не подключена"),
+                        else "Осмотр не начат"),
         "telemetry": bool(ctx.values),
         "diagnoses": diagnoses,
         "guidance": guidance,
         "components": components,
-        "not_covered": NOT_COVERED,
     }

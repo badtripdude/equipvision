@@ -105,11 +105,6 @@ CENTRIFUGAL = _unit(
             "Мощность двигателя": "7,5 кВт", "Частота вращения": "2900 об/мин",
             "Подача": "до 132 м³/ч", "Напор": "до 23 м",
         },
-        "Происхождение данных": {
-            "Паспорт": "в материалах заказчика нет, карточка демонстрационная",
-            "Серийный номер, дата ввода, нормативы узлов, история": "приняты командой",
-            "Телеметрия": "базы вибрации и температуры заказчика",
-        },
     }, ensure_ascii=False),
 )
 CENTRIFUGAL_COMPONENTS = [
@@ -201,13 +196,6 @@ def screw_specs(n: int) -> str:
         "Проектные условия (опросный лист 0201)": {
             "Среда": "нефтяной шлам сточных вод", "Подача номинальная": "18 м³/ч (5–20)", "Напор": "60 м",
             "Режим работы": "периодический", "Срок службы по опросному листу": "10 лет",
-            "Привязка агрегатов к позициям": "в документах не указана",
-        },
-        "Оговорки": {
-            "Наработка": "в документах её нет, значение демонстрационное",
-            "Нормативы отдельных узлов": "в документах не заданы, узлы оцениваются по состоянию",
-            "Сверка": "характеристики выписаны из паспортов агрегата № 1; агрегаты № 2–4 той же модели, "
-                      "их собственные паспорта открываются в списке документов",
         },
     }, ensure_ascii=False)
 
@@ -273,6 +261,8 @@ def init_db() -> None:
                 [(u["username"], u["name"], u["role"], auth.hash_password(u["password"])) for u in seed_users],
             )
         if conn.execute("SELECT COUNT(*) FROM equipment").fetchone()[0]:
+            # The characteristics are reference data kept in the code: bring an existing database up to date.
+            conn.executemany("UPDATE equipment SET specs = :specs WHERE id = :id", [CENTRIFUGAL, *SCREW_UNITS])
             return
         seed = [(CENTRIFUGAL, CENTRIFUGAL_COMPONENTS, CENTRIFUGAL_EVENTS)]
         seed += [(unit, SCREW_COMPONENTS, []) for unit in SCREW_UNITS]

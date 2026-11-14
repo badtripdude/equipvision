@@ -13,6 +13,7 @@ SIGNS = {
     "overheat": "следы перегрева",
     "loose_fastener": "ослабленный крепёж",
     "guard_missing": "нет защитного кожуха",
+    "photo": "дефект (фото)",            # a frame the engineer took with the shutter button
 }
 CAMERA_SIGNS = ("corrosion", "leak", "overheat")
 

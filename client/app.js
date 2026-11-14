@@ -66,6 +66,7 @@ let user = null;                      // signed-in user: {username, name, role, 
 const training = { active: false, steps: [], index: 0, answers: {}, result: null };
 const guiding = () => training.active && !training.result;
 let signTitles = {};
+const PHOTO_SIGN = 'photo';          // a finding made with the shutter button: the frame itself is the record
 
 const api = async (path, body) => {
   const res = await fetch(path, body === undefined ? undefined : {
@@ -479,8 +480,8 @@ function renderDiagnosis(dg) {
   $('dg-icon').setAttribute('href', `#i-${LEVEL_ICON[level] || 'info'}`);
   $('dg-status').textContent = dg.status_text;
   $('dg-sub').textContent = dg.diagnoses.length
-    ? `Замечаний: ${dg.diagnoses.length}` + (dg.telemetry ? ` · данные датчиков на ${dg.ts}` : ' · телеметрия не подключена')
-    : 'Система видит только внешние признаки: это не подтверждение исправности.';
+    ? `Замечаний: ${dg.diagnoses.length}` + (dg.telemetry ? ` · данные датчиков на ${dg.ts}` : '')
+    : 'Выберите узел и наведите на него камеру.';
 
   const badge = $('badge-inspect');
   badge.hidden = dg.diagnoses.length === 0;
@@ -516,9 +517,6 @@ function renderDiagnosis(dg) {
     card.append(head, body);
     box.append(card);
   });
-
-  const limits = $('not-covered');
-  if (!limits.childElementCount) for (const text of dg.not_covered) limits.append(el('li', '', text));
 
   const found = $('findings');
   found.replaceChildren();
@@ -572,6 +570,19 @@ $('manual-add').addEventListener('click', act(async () => {
   snack(`Записано: ${sign.selectedOptions[0].textContent} — ${focusSelect.selectedOptions[0].textContent}`);
   pollDiagnosis();
 }));
+// The shutter: the engineer takes the frame on purpose, and it goes to the findings with its photo.
+$('shutter').addEventListener('click', act(async () => {
+  if (!needFocus('Сначала выберите узел, к которому относится фото.')) return;
+  const frame = currentFrame();
+  if (!frame) {
+    snack('Камера ещё не готова');
+    return;
+  }
+  lastDiagnosisJson = '';
+  renderDiagnosis(await post('findings', { component: focusSelect.value, sign: PHOTO_SIGN, frame }));
+  snack(`Фото сохранено в дефекты: ${focusSelect.selectedOptions[0].textContent}`);
+}));
+
 $('insp-save').addEventListener('click', act(async () => {
   const saved = await post('inspection/complete');
   focusSelect.value = '';          // the saved inspection is closed: stop recording onto its last component
@@ -618,6 +629,7 @@ async function loadSigns() {
   select.replaceChildren();
   signTitles = await api('/api/signs');
   for (const [code, title] of Object.entries(signTitles)) {
+    if (code === PHOTO_SIGN) continue;
     const option = el('option', '', title);
     option.value = code;
     select.append(option);
@@ -712,7 +724,7 @@ function renderCard(card) {
   $('eq-hours').textContent = `${num(card.hours)} моточасов`;
   $('eq-hours-note').textContent = card.has_telemetry
     ? 'Считаются по телеметрии, только когда агрегат в работе.'
-    : 'Последнее известное значение: телеметрия не подключена.';
+    : 'Последнее известное значение.';
   $('eq-resource').hidden = !card.resource;
   if (card.resource) {
     const r = card.resource;
@@ -1152,6 +1164,7 @@ function renderTraining() {
   result.hidden = !training.result;
   $('live').hidden = guiding();                // the system's findings are revealed after the run
   $('manual-row').hidden = guiding();
+  $('shutter').classList.toggle('off', guiding());
   focusSelect.disabled = guiding();
   drawOverlay();
   if (training.result) renderTrainingResult();
@@ -1177,7 +1190,9 @@ function renderTraining() {
   card.append(hint, el('div', 'title-small', 'Что вы видите?'));
   const chips = el('div', 'chip-wrap');
   chips.append(answerChip(step.component, null, 'Замечаний нет'));
-  for (const [sign, title] of Object.entries(signTitles)) chips.append(answerChip(step.component, sign, title));
+  for (const [sign, title] of Object.entries(signTitles)) {
+    if (sign !== PHOTO_SIGN) chips.append(answerChip(step.component, sign, title));
+  }
   card.append(chips);
 
   const actions = el('div', 'actions');
@@ -1207,15 +1222,14 @@ function renderTrainingResult() {
   box.append(el('div', 'label-medium', 'Оценка осмотра'), el('div', 'score', `${r.score} из 100`),
     el('div', 'title-medium', r.grade),
     el('p', '', `Осмотрено узлов: ${r.inspected} из ${r.total}. ` + (r.attention === null
-      ? 'Камера не зафиксировала признаков дефектов, поэтому внимательность не оценивалась.'
+      ? 'Признаков дефектов на узлах нет: оценка поставлена за полноту осмотра.'
       : `Найдено признаков: ${r.found} из ${r.expected}, зафиксированных камерой.`)));
   const steps = el('div', 'list');
   for (const s of r.steps) {
     steps.append(listItem({ lead: s.ok ? 'check_circle' : s.looked ? 'warning' : 'circle', headline: s.name, supporting: s.comment }));
   }
   box.append(steps, el('p', 'body-small muted',
-    'Эталон — то, что зафиксировала камера. Она тоже ошибается: спорные случаи разберите с наставником. ' +
-    'Ниже показано, что нашла система.'));
+    'Ниже показано, что нашла система. Спорные случаи разберите с наставником.'));
   const actions = el('div', 'actions');
   const again = el('button', 'btn filled', 'Пройти заново');
   again.type = 'button';
@@ -1422,3 +1436,8 @@ setInterval(pollTelemetry, 1000);
 setInterval(identifyFrame, 1000);
 setInterval(refreshCard, 5000);
 setInterval(pollDiagnosis, 1000);
+
+// Pinch zoom breaks the fixed navigation on a phone; iOS ignores the viewport setting, so stop its gesture too.
+for (const type of ['gesturestart', 'gesturechange']) {
+  document.addEventListener(type, (event) => event.preventDefault());
+}
