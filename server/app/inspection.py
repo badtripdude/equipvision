@@ -74,6 +74,8 @@ class FrameTracker:
 class Session:
     findings: dict[tuple[str, str], Finding] = field(default_factory=dict)
     frames: dict[str, int] = field(default_factory=dict)
+    # Findings the engineer removed as wrong: the camera must not put them back in this inspection.
+    dismissed: set[tuple[str, str]] = field(default_factory=set)
 
     def inspected(self) -> set[str]:
         seen = {code for code, n in self.frames.items() if n >= INSPECTED_FRAMES}
@@ -98,6 +100,8 @@ def observe(equipment_id: str, component: str, confirmed: dict[str, float], ts: 
     new = []
     for sign, score in confirmed.items():
         key = (component, sign)
+        if key in s.dismissed:
+            continue
         known = s.findings.get(key)
         if known is None:
             s.findings[key] = Finding(component, sign, score, "camera", ts)
@@ -111,4 +115,14 @@ def add_manual(equipment_id: str, component: str, sign: str, ts: str, note: str 
                photo: str | None = None) -> Finding:
     finding = Finding(component, sign, None, "manual", ts, note, photo)
     session(equipment_id).findings[(component, sign)] = finding
+    session(equipment_id).dismissed.discard((component, sign))     # the engineer's own word outweighs an earlier removal
+    return finding
+
+
+def remove(equipment_id: str, component: str, sign: str) -> Finding | None:
+    """Take a finding out of the current inspection; a camera finding will not be recorded again."""
+    s = session(equipment_id)
+    finding = s.findings.pop((component, sign), None)
+    if finding is not None:
+        s.dismissed.add((component, sign))
     return finding

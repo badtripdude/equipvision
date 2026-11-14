@@ -1,6 +1,8 @@
 """Start the local server.
 
-    .venv/Scripts/python run.py            HTTPS on 0.0.0.0:8443 — open from the phone
+    .venv/Scripts/python run.py            HTTPS on 0.0.0.0:8443 — open from a phone in the same network
+    .venv/Scripts/python run.py --public   plain HTTP on 0.0.0.0:8080 — for users outside the network,
+                                           behind an HTTPS tunnel or reverse proxy (demonstration)
     .venv/Scripts/python run.py --no-tls   plain HTTP on 127.0.0.1:8000 — desktop development only
 """
 import argparse
@@ -12,7 +14,10 @@ import uvicorn
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--no-tls", action="store_true", help="plain HTTP, localhost only")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--no-tls", action="store_true", help="plain HTTP, localhost only, developer helpers on")
+    mode.add_argument("--public", action="store_true",
+                      help="plain HTTP on all interfaces, to be put behind an HTTPS tunnel or reverse proxy")
     parser.add_argument("--port", type=int)
     parser.add_argument("--db", help="path of the database file (default: server/data/equipvision.sqlite3)")
     args = parser.parse_args()
@@ -28,6 +33,19 @@ def main() -> None:
         port = args.port or 8000
         print(f"Только для разработки: http://localhost:{port}", flush=True)
         uvicorn.run(app, host="127.0.0.1", port=port)
+        return
+
+    if args.public:
+        # The tunnel or proxy in front terminates HTTPS: the browser gives the camera and the microphone
+        # only to an https:// page. Its X-Forwarded-* headers tell the server the real scheme and client.
+        port = args.port or 8080
+        print("Режим демонстрации для внешних пользователей.", flush=True)
+        print(f"Сервер слушает http://0.0.0.0:{port} и ждёт подключений через HTTPS-туннель или обратный прокси,", flush=True)
+        print(f"например: cloudflared tunnel --url http://localhost:{port}", flush=True)
+        print("Откройте пользователям адрес https://…, который выдаст туннель: без HTTPS браузер не даст камеру.", flush=True)
+        print("Внимание: пароли демонстрационных учётных записей лежат в репозитории — не оставляйте сервер "
+              "открытым дольше показа.", flush=True)
+        uvicorn.run(app, host="0.0.0.0", port=port, proxy_headers=True, forwarded_allow_ips="*")
         return
 
     from app.certs import ensure_cert

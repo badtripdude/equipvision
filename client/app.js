@@ -471,6 +471,7 @@ function needFocus(message) {
 }
 
 const LEVEL_SHORT = { warn: 'Рекомендуется проверка', alarm: 'Признаки возможного дефекта' };
+const diagnosisOpen = new Map();     // which diagnoses the engineer unfolded or folded: id -> open
 
 function renderDiagnosis(dg) {
   const level = dg.diagnoses.length || dg.status !== 'ok' ? dg.status : '';
@@ -496,21 +497,25 @@ function renderDiagnosis(dg) {
   const names = Object.fromEntries((lastCard?.components || []).map((c) => [c.code, c.name]));
   const box = $('diagnoses');
   box.replaceChildren();
-  for (const d of dg.diagnoses) {
-    const card = el('article', `card outlined diagnosis ${d.level}`);
-    const head = el('div', 'diagnosis-head');
+  dg.diagnoses.forEach((d, index) => {
+    // Folded to a heading so that the screen stays short; the first, most serious one is open.
+    const card = el('details', `card outlined flush fold diagnosis ${d.level}`);
+    card.open = diagnosisOpen.has(d.id) ? diagnosisOpen.get(d.id) : index === 0;
+    card.addEventListener('toggle', () => diagnosisOpen.set(d.id, card.open));
+    const head = el('summary', 'diagnosis-head');
     const titles = el('div');
     titles.append(el('div', 'title-medium', d.title), el('div', 'body-small muted',
       `${LEVEL_SHORT[d.level]} · ${d.component ? names[d.component] || d.component : 'агрегат в целом'}`));
     head.append(icon(LEVEL_ICON[d.level]), titles);
-    card.append(head, el('p', '', d.diagnosis));
+    const body = el('div', 'fold-body diagnosis-body');
     const reasons = el('ul', 'evidence');
     for (const text of d.evidence) reasons.append(el('li', '', text));
     const advice = el('div', 'recommendation');
     advice.append(el('span', 'label-medium', 'Что делать'), el('span', '', d.recommendation));
-    card.append(reasons, advice, el('p', 'body-small muted', `Основание: ${d.basis}`));
+    body.append(el('p', '', d.diagnosis), reasons, advice, el('p', 'body-small muted', `Основание: ${d.basis}`));
+    card.append(head, body);
     box.append(card);
-  }
+  });
 
   const limits = $('not-covered');
   if (!limits.childElementCount) for (const text of dg.not_covered) limits.append(el('li', '', text));
@@ -518,13 +523,27 @@ function renderDiagnosis(dg) {
   const found = $('findings');
   found.replaceChildren();
   $('findings-card').hidden = dg.findings.length === 0;
+  $('findings-count').textContent = ` · ${dg.findings.length}`;
   for (const f of dg.findings) {
     const how = f.source === 'manual' ? 'отмечено вручную' : `камера, уверенность ${Math.round((f.score || 0) * 100)}%`;
-    found.append(listItem({
-      lead: 'warning', tone: 'warn', headline: `${f.sign_title[0].toUpperCase()}${f.sign_title.slice(1)} · ${f.component_name}`,
+    const title = `${f.sign_title[0].toUpperCase()}${f.sign_title.slice(1)} · ${f.component_name}`;
+    const row = el('div', 'finding-row');
+    const remove = el('button', 'icon-button');
+    remove.type = 'button';
+    remove.setAttribute('aria-label', `Удалить: ${title}`);
+    remove.append(icon('delete'));
+    remove.addEventListener('click', act(async () => {
+      if (!window.confirm(`Удалить из осмотра «${title}»?`)) return;
+      lastDiagnosisJson = '';
+      renderDiagnosis(await post('findings/remove', { component: f.component, sign: f.sign }));
+      snack('Дефект удалён из осмотра. Камера не запишет его снова до нового осмотра.');
+    }));
+    row.append(listItem({
+      lead: 'warning', tone: 'warn', headline: title,
       supporting: how + (f.photo ? ' · фото сохранено' : ' · без фото'), photo: f.photo,
       onClick: f.photo ? () => openPhoto(f.photo, `${f.sign_title} · ${f.component_name}`) : undefined,
-    }));
+    }), remove);
+    found.append(row);
   }
   renderTraining();
 }

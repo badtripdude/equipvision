@@ -186,6 +186,26 @@ class Api(unittest.TestCase):
         engineer.post("/api/equipment/PCP-1/inspection/reset")
         self.assertEqual(engineer.get(f"/api/photos/{name}").status_code, 404)
 
+    def test_engineer_removes_a_wrong_finding_and_the_camera_does_not_put_it_back(self):
+        engineer = self.client("engineer")
+        engineer.post("/api/equipment/PCP-3/inspection/reset")
+        self.look_at(engineer, "PCP-3", "frame")
+        finding = engineer.get("/api/equipment/PCP-3/diagnosis").json()["findings"][0]
+        ref = {"component": finding["component"], "sign": finding["sign"]}
+        self.assertEqual(self.client().post("/api/equipment/PCP-3/findings/remove", json=ref).status_code, 401)
+
+        after = engineer.post("/api/equipment/PCP-3/findings/remove", json=ref)
+        self.assertEqual((after.status_code, after.json()["findings"]), (200, []))
+        self.assertFalse(any(d["id"].startswith("visual:") for d in after.json()["diagnoses"]))
+        self.assertEqual(engineer.get(f"/api/photos/{finding['photo']}").status_code, 404)
+        self.assertEqual(engineer.post("/api/equipment/PCP-3/findings/remove", json=ref).status_code, 404)
+
+        self.look_at(engineer, "PCP-3", "frame")                          # the camera still sees the same thing
+        self.assertEqual(engineer.get("/api/equipment/PCP-3/diagnosis").json()["findings"], [])
+        engineer.post("/api/equipment/PCP-3/findings", json={**ref, "note": "всё-таки есть"})      # by hand it comes back
+        self.assertEqual(len(engineer.get("/api/equipment/PCP-3/diagnosis").json()["findings"]), 1)
+        engineer.post("/api/equipment/PCP-3/inspection/reset")
+
     def test_round_tracks_inspected_and_skipped_units(self):
         engineer = self.client("engineer")
         active = engineer.post("/api/round/start").json()["active"]

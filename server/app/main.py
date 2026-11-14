@@ -312,6 +312,23 @@ def add_finding(equipment_id: str, finding: FindingIn, request: Request):
     return diagnose(card)
 
 
+class FindingRef(BaseModel):
+    component: str
+    sign: str
+
+
+@app.post("/api/equipment/{equipment_id}/findings/remove")
+def remove_finding(equipment_id: str, ref: FindingRef, request: Request):
+    """The engineer removes a finding of the current inspection, for example a mistake of the model."""
+    need(request, "inspect")
+    card = load_card(equipment_id)
+    finding = inspection.remove(equipment_id, ref.component, ref.sign)
+    if finding is None:
+        raise HTTPException(404, "Такой находки в текущем осмотре нет")
+    photos.delete(finding.photo)
+    return diagnose(card)
+
+
 @app.post("/api/equipment/{equipment_id}/inspection/reset")
 def inspection_reset(equipment_id: str, request: Request):
     need(request, "inspect")

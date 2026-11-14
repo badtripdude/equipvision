@@ -287,6 +287,22 @@ main { padding: 16px; max-width: 1400px; margin: 0 auto; }
 .inspect-controls { display: grid; gap: 16px; }
 .manual-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
 
+/* ---------- folding sections: a heading that opens, to keep the inspection screen short ---------- */
+
+.fold > summary { font: 500 14px/20px Roboto, "Segoe UI", sans-serif; letter-spacing: .1px; }
+.fold-body { padding: 4px 16px 16px; }
+.fold .manual-row.fold-body { padding-top: 12px; --field-bg: var(--md-surface-container-low); }
+.fold > summary .count { color: var(--md-on-surface-variant); }
+details.diagnosis { display: block; }
+details.diagnosis > summary.diagnosis-head { justify-content: flex-start; align-items: center; padding: 10px 16px; min-height: 64px; }
+details.diagnosis > summary.diagnosis-head > div { flex: 1; min-width: 0; }
+.diagnosis.warn > summary .icon { color: var(--md-warning); }
+.diagnosis.alarm > summary .icon { color: var(--md-error); }
+.diagnosis-body { display: grid; gap: 10px; }
+.finding-row { display: flex; align-items: center; }
+.finding-row > .list-item { flex: 1; min-width: 0; }
+.finding-row > .icon-button { margin-right: 4px; }
+
 /* navigation: bar at the bottom on phones, rail on the left on wide screens */
 .nav {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 9; height: var(--nav-bar);

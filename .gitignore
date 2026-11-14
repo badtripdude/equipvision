@@ -10,5 +10,4 @@ datasets/
 server/data/doc-cache/
 server/data/photos/
 docs
-.claude
 .idea
