@@ -11,3 +11,7 @@ server/data/doc-cache/
 server/data/photos/
 docs
 .idea
+
+# Android application: build output and the signing key
+android/build/
+android/keystore/

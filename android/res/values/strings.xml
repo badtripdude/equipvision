@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">EquipVision</string>
+    <string name="setup_title">Адрес сервера</string>
+    <string name="setup_hint">Введите адрес сервера EquipVision, начиная с https://. Например, https://192.168.1.104:8443 в сети цеха или адрес туннеля.</string>
+    <string name="setup_placeholder">https://</string>
+    <string name="setup_open">Открыть</string>
+    <string name="error_address">Введите адрес сервера.</string>
+    <string name="error_https">Нужен адрес, начинающийся с https://: без защищённого соединения камера не работает.</string>
+    <string name="error_load">Не удалось открыть %1$s: %2$s</string>
+    <string name="cert_title">Сертификат сервера</string>
+    <string name="cert_message">Сервер %1$s использует сертификат, который устройство не может проверить. Так бывает у сервера в локальной сети с самоподписанным сертификатом. Продолжайте, только если это ваш сервер.</string>
+    <string name="cert_continue">Продолжить</string>
+    <string name="cert_cancel">Отмена</string>
+    <string name="cert_rejected">Соединение отклонено: сертификат сервера не принят.</string>
+    <string name="menu_change">Сменить адрес сервера</string>
+    <string name="menu_reload">Обновить страницу</string>
+    <string name="menu_exit">Закрыть приложение</string>
+    <string name="download_started">Файл сохраняется в «Загрузки»: %1$s</string>
+    <string name="download_failed">Не удалось сохранить файл</string>
+</resources>
