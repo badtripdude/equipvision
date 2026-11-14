@@ -1,0 +1,410 @@
+{
+ "about": "Leak / overheat boxes on the customer's example photos, drawn by hand from a 10x10 grid. box = x1, y1, x2, y2 as fractions of the image. 'ignore' marks areas that are neither a clear positive nor a clear negative (salt crust, old stains). Images in one 'group' show the same scene and always stay on the same side of a train/test split. Corrosion is not labelled here.",
+ "root": "docs/Кейс/Кейс",
+ "excluded": {
+  "ambiguous": [
+   "Насосные агрегаты/photo_2026-11-13_12-53-12.jpg",
+   "Насосные агрегаты/Безымянный.png",
+   "Запорная арматура/1396430378_7447321.jpg",
+   "Запорная арматура/Безымянный.png",
+   "Трубопровод/korroziya.png"
+  ],
+  "internal_parts_not_seen_on_a_walkaround": [
+   "Насосные агрегаты/4.jpg",
+   "ЭД/1.PNG",
+   "ЭД/3.PNG",
+   "ЭД/55.PNG",
+   "ЭД/66.PNG",
+   "ЭД/8.PNG",
+   "ЭД/IMG_20261113_142620.jpg",
+   "ЭД/Снимок.PNG",
+   "ЭД/эд.PNG",
+   "ЭД/эдд.PNG"
+  ]
+ },
+ "images": [
+  {
+   "file": "Насосные агрегаты/16c811b0db124c77b276a1a06bc1d3fb.png",
+   "group": "p_term1",
+   "boxes": [
+    {
+     "sign": "overheat",
+     "box": [
+      0.1,
+      0.52,
+      0.55,
+      0.92
+     ]
+    },
+    {
+     "sign": "overheat",
+     "box": [
+      0.52,
+      0.18,
+      0.8,
+      0.58
+     ]
+    }
+   ]
+  },
+  {
+   "file": "Насосные агрегаты/2c510abd88b648efb8841d297d432aee.png",
+   "group": "p_unit1",
+   "boxes": []
+  },
+  {
+   "file": "Насосные агрегаты/60cb39e72d7e4bc38d47e945b66900f8.png",
+   "group": "p_seal",
+   "boxes": [
+    {
+     "sign": "leak",
+     "box": [
+      0.44,
+      0.36,
+      0.57,
+      0.86
+     ]
+    }
+   ]
+  },
+  {
+   "file": "Насосные агрегаты/6bd1015378aa4382aedc45fe4b7adda4.png",
+   "group": "p_base",
+   "boxes": [
+    {
+     "sign": "ignore",
+     "box": [
+      0.2,
+      0.75,
+      0.75,
+      0.97
+     ]
+    }
+   ]
+  },
+  {
+   "file": "Насосные агрегаты/kavitacija2.jpg",
+   "group": "p_impeller",
+   "boxes": []
+  },
+  {
+   "file": "Насосные агрегаты/obsledovanie-hvs-gvs-2.jpg",
+   "group": "p_valve",
+   "boxes": []
+  },
+  {
+   "file": "Насосные агрегаты/photo_2026-11-13_12-46-46.jpg",
+   "group": "p_scene",
+   "boxes": []
+  },
+  {
+   "file": "Насосные агрегаты/photo_2026-11-13_12-48-02.jpg",
+   "group": "p_term2",
+   "boxes": [
+    {
+     "sign": "overheat",
+     "box": [
+      0.42,
+      0.4,
+      0.67,
+      0.73
+     ]
+    }
+   ]
+  },
+  {
+   "file": "Насосные агрегаты/photo_2026-11-13_12-48-03.jpg",
+   "group": "p_term2",
+   "boxes": [
+    {
+     "sign": "overheat",
+     "box": [
+      0.45,
+      0.48,
+      0.68,
+      0.78
+     ]
+    }
+   ]
+  },
+  {
+   "file": "Насосные агрегаты/photo_2026-11-13_12-48-48.jpg",
+   "group": "p_term3",
+   "boxes": [
+    {
+     "sign": "overheat",
+     "box": [
+      0.18,
+      0.42,
+      0.42,
+      0.6
+     ]
+    }
+   ]
+  },
+  {
+   "file": "Насосные агрегаты/photo_2026-11-13_12-51-10 (2).jpg",
+   "group": "p_fit1",
+   "boxes": [
+    {
+     "sign": "leak",
+     "box": [
+      0.22,
+      0.56,
+      0.8,
+      0.78
+     ]
+    }
+   ]
+  },
+  {
+   "file": "Насосные агрегаты/Снимок1.PNG",
+   "group": "p_fit1",
+   "boxes": [
+    {
+     "sign": "leak",
+     "box": [
+      0.22,
+      0.56,
+      0.8,
+      0.78
+     ]
+    }
+   ]
+  },
+  {
+   "file": "Насосные агрегаты/photo_2026-11-13_12-51-10.jpg",
+   "group": "p_fit2",
+   "boxes": [
+    {
+     "sign": "ignore",
+     "box": [
+      0.42,
+      0.3,
+      0.68,
+      0.58
+     ]
+    }
+   ]
+  },
+  {
+   "file": "Насосные агрегаты/Снимок.PNG",
+   "group": "p_fit2",
+   "boxes": [
+    {
+     "sign": "ignore",
+     "box": [
+      0.42,
+      0.3,
+      0.68,
+      0.58
+     ]
+    }
+   ]
+  },
+  {
+   "file": "Насосные агрегаты/Сниимок.PNG",
+   "group": "p_smoke",
+   "boxes": [
+    {
+     "sign": "overheat",
+     "box": [
+      0.38,
+      0.02,
+      0.72,
+      0.7
+     ]
+    }
+   ]
+  },
+  {
+   "file": "Насосные агрегаты/silnaja-korrozija-1-450x338.jpg",
+   "group": "p_pipe",
+   "boxes": []
+  },
+  {
+   "file": "Насосные агрегаты/td_010_02.png",
+   "group": "p_crack",
+   "boxes": []
+  },
+  {
+   "file": "Насосные агрегаты/насос.jpg",
+   "group": "p_unit2",
+   "boxes": []
+  },
+  {
+   "file": "Запорная арматура/0831c2a9-3a2b-5bf7-b70f-05f1d51f5cdb (1).jpg",
+   "group": "v_sea",
+   "boxes": []
+  },
+  {
+   "file": "Запорная арматура/0831c2a9-3a2b-5bf7-b70f-05f1d51f5cdb.jpg",
+   "group": "v_white",
+   "boxes": []
+  },
+  {
+   "file": "Запорная арматура/86.PNG",
+   "group": "v_butterfly",
+   "boxes": []
+  },
+  {
+   "file": "Запорная арматура/cca9d029-459e-5007-8f88-181843ed8665.jpg",
+   "group": "v_ball",
+   "boxes": [
+    {
+     "sign": "leak",
+     "box": [
+      0.4,
+      0.33,
+      0.66,
+      0.97
+     ]
+    },
+    {
+     "sign": "leak",
+     "box": [
+      0.3,
+      0.72,
+      0.37,
+      0.95
+     ]
+    }
+   ]
+  },
+  {
+   "file": "Запорная арматура/i.jpg",
+   "group": "v_crust",
+   "boxes": [
+    {
+     "sign": "ignore",
+     "box": [
+      0.43,
+      0.25,
+      0.62,
+      0.5
+     ]
+    }
+   ]
+  },
+  {
+   "file": "Запорная арматура/IMG_20160324_100411.jpg",
+   "group": "v_wet",
+   "boxes": [
+    {
+     "sign": "leak",
+     "box": [
+      0.12,
+      0.25,
+      0.6,
+      0.68
+     ]
+    }
+   ]
+  },
+  {
+   "file": "Запорная арматура/IMG_20261113_142550.jpg",
+   "group": "v_flange",
+   "boxes": []
+  },
+  {
+   "file": "Запорная арматура/IMG_20261113_142555.jpg",
+   "group": "v_drip",
+   "boxes": [
+    {
+     "sign": "leak",
+     "box": [
+      0.33,
+      0.28,
+      0.6,
+      0.7
+     ]
+    }
+   ]
+  },
+  {
+   "file": "Трубопровод/1corrsia.jpg",
+   "group": "t_drip",
+   "boxes": [
+    {
+     "sign": "leak",
+     "box": [
+      0.28,
+      0.52,
+      0.62,
+      1.0
+     ]
+    }
+   ]
+  },
+  {
+   "file": "Трубопровод/354c86b2f75e35fdf90ce044cf02d997-big.jpg",
+   "group": "t_weld",
+   "boxes": []
+  },
+  {
+   "file": "Трубопровод/IMG_20261113_143107.jpg",
+   "group": "t_coat",
+   "boxes": []
+  },
+  {
+   "file": "Трубопровод/IMG_20261113_143112.jpg",
+   "group": "t_crack1",
+   "boxes": []
+  },
+  {
+   "file": "Трубопровод/IMG_20261113_143116.jpg",
+   "group": "t_crack2",
+   "boxes": []
+  },
+  {
+   "file": "Трубопровод/IMG_20261113_143119.jpg",
+   "group": "t_fracture",
+   "boxes": []
+  },
+  {
+   "file": "Трубопровод/Photo-9-Mechanically-Damaged-Insulation-on-Chilled-Water-Pipe.jpg",
+   "group": "t_insul",
+   "boxes": []
+  },
+  {
+   "file": "Трубопровод/stock-photo-corroded-flanged-joint-with-peeling-paint-and-oxidation-2738414417.jpg",
+   "group": "t_flange1",
+   "boxes": []
+  },
+  {
+   "file": "Трубопровод/stock-photo-corroded-industrial-water-pump-flange-joint-covered-in-heavy-mineral-salt-2840981719.jpg",
+   "group": "t_salt",
+   "boxes": [
+    {
+     "sign": "ignore",
+     "box": [
+      0.2,
+      0.5,
+      0.92,
+      0.92
+     ]
+    }
+   ]
+  },
+  {
+   "file": "Трубопровод/stock-photo-rusty-industrial-pipe-and-flange-connection-this-rusty-industrial-pipe-and-flange-connection-2733059369.jpg",
+   "group": "t_flange2",
+   "boxes": []
+  },
+  {
+   "file": "Трубопровод/unnamed.jpg",
+   "group": "t_flange3",
+   "boxes": []
+  },
+  {
+   "file": "ЭД/65d7bec338d641b8ab2a8718af266a74.png",
+   "group": "m_fins",
+   "boxes": []
+  },
+  {
+   "file": "ЭД/81316b33970247cdbc980ceccd88cb9a.png",
+   "group": "m_shield",
+   "boxes": []
+  }
+ ]
+}

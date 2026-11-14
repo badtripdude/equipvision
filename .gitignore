@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+server/certs/
+server/data/*.sqlite3
+tmp/
+server/models/*
+!server/models/defect-head/
+datasets/
+server/data/doc-cache/
+server/data/photos/
+docs
+.claude
+.idea

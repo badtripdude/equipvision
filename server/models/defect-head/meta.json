@@ -1,0 +1,92 @@
+{
+ "backbone": "dinov2-base",
+ "dim": 768,
+ "signs": [
+  "corrosion",
+  "leak",
+  "overheat"
+ ],
+ "thresholds": {
+  "corrosion": 0.5,
+  "leak": 0.5,
+  "overheat": 0.3
+ },
+ "long_side": 448,
+ "calibration": {
+  "corrosion": [
+   0.4676,
+   -0.6415
+  ],
+  "leak": [
+   0.2839,
+   -1.9389
+  ],
+  "overheat": [
+   0.4047,
+   0.019
+  ]
+ },
+ "training": {
+  "capture": 0.0,
+  "docs": true,
+  "transformer": true,
+  "refine": 0,
+  "seed": 0,
+  "epochs": 12
+ },
+ "measured": {
+  "leak": {
+   "found": "6/7",
+   "false_images": "4/32",
+   "patch_ap": 0.305
+  },
+  "overheat": {
+   "found": "4/5",
+   "false_images": "0/34",
+   "patch_ap": 0.211
+  },
+  "new_val_leak": {
+   "found": "26/28",
+   "false_images": "5/122",
+   "patch_ap": 0.602
+  },
+  "new_val_overheat": {
+   "found": "0/0",
+   "false_images": "0/150",
+   "patch_ap": 0.0
+  },
+  "new_test_leak": {
+   "found": "14/15",
+   "false_images": "0/72",
+   "patch_ap": 0.508
+  },
+  "new_test_overheat": {
+   "found": "0/0",
+   "false_images": "1/87",
+   "patch_ap": 0.0
+  },
+  "false_on_ostrava_no_leak_or_burn": {
+   "leak": 0,
+   "overheat": 0,
+   "any": 0,
+   "of": 30
+  },
+  "false_on_documents": {
+   "corrosion": 0,
+   "leak": 0,
+   "overheat": 0,
+   "any": 0,
+   "of": 28
+  },
+  "corrosion_validation": {
+   "iou": 0.772,
+   "precision": 0.812,
+   "recall": 0.939
+  },
+  "corrosion_test": {
+   "iou": 0.748,
+   "precision": 0.793,
+   "recall": 0.93
+  }
+ }
+}

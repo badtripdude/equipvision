@@ -1,0 +1,8 @@
+{
+  "about": "Demo accounts, created on first start when the user table is empty. Change the passwords before any real use: this file is in the repository.",
+  "users": [
+    {"username": "engineer", "name": "Инженер смены", "role": "engineer", "password": "obhod-2026"},
+    {"username": "master", "name": "Мастер участка", "role": "master", "password": "remont-2026"},
+    {"username": "admin", "name": "Администратор", "role": "admin", "password": "sklad-2026"}
+  ]
+}

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Шильдики и QR-коды</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .unit { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; break-inside: avoid; }
+    .plate { width: 380px; padding: 18px 22px; border: 2px solid #333; border-radius: 8px; color: #111;
+             background: linear-gradient(#e6e8ea, #c9cdd1); font-family: Arial, Helvetica, sans-serif; }
+    .plate .maker { font-size: 14px; letter-spacing: .08em; }
+    .plate .model { font-size: 20px; font-weight: 700; margin: 6px 0 10px; }
+    .plate .serial { font-size: 26px; font-weight: 700; letter-spacing: .04em; }
+    .plate .small { font-size: 13px; margin-top: 8px; }
+    .qr { text-align: center; }
+    .qr img { display: block; width: 190px; height: 190px; image-rendering: pixelated; background: #fff; }
+    @media print { .top-app-bar, .no-print { display: none; } body { background: #fff; } .card { border: 0; } }
+  </style>
+</head>
+<body>
+  <header class="top-app-bar">
+    <div class="app-bar-title"><span class="title-large">Шильдики и QR-коды</span></div>
+    <button class="btn filled no-print" type="button" onclick="print()" style="margin-right: 12px">Печать</button>
+  </header>
+  <main class="stack">
+  <p class="muted no-print">Для демонстрационного стенда: распечатайте страницу и закрепите шильдик или код рядом
+    с изображением агрегата. Камера читает серийный номер с шильдика либо QR-код.</p>
+  <div id="units" class="stack"></div>
+  </main>
+  <script type="module">
+    const el = (tag, className, text) => {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    };
+    const box = document.getElementById('units');
+    const res = await fetch('/api/equipment');
+    if (!res.ok) box.append(el('p', 'error-text', 'Сначала войдите в приложение на главной странице, затем обновите эту.'));
+    for (const unit of res.ok ? await res.json() : []) {
+      const row = el('div', 'unit card outlined');
+      const plate = el('div', 'plate');
+      plate.append(
+        el('div', 'maker', unit.manufacturer || 'PUMP UNIT'),
+        el('div', 'model', unit.model),
+        el('div', 'serial', `S/N ${unit.serial}`),
+        el('div', 'small', 'MADE IN RUSSIA'),
+      );
+      const qr = el('div', 'qr');
+      const img = el('img');
+      img.src = `/api/equipment/${encodeURIComponent(unit.id)}/qr.png`;
+      img.alt = `QR-код ${unit.id}`;
+      qr.append(img, el('div', '', unit.id));
+      row.append(plate, qr);
+      box.append(row);
+    }
+  </script>
+</body>
+</html>
