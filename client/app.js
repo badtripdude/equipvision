@@ -22,8 +22,8 @@ const num = (value, digits = 0) =>
   value.toLocaleString('ru-RU', { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
 /** A Material list item: leading icon, headline, supporting text, trailing text or icon. */
-function listItem({ lead, tone, headline, supporting, trailing, chevron, photo, onClick }) {
-  const item = el(onClick ? 'button' : 'li', `list-item${onClick ? ' interactive' : ''}`);
+function listItem({ lead, tone, headline, supporting, trailing, chevron, photo, onClick, as = 'li' }) {
+  const item = el(onClick ? 'button' : as, `list-item${onClick ? ' interactive' : ''}`);
   if (onClick) {
     item.type = 'button';
     item.addEventListener('click', onClick);
@@ -357,7 +357,7 @@ function setVerdict(text, level = '') {
 
 function showVerdict(msg) {
   if (guiding()) {
-    setVerdict('Режим обучения: что нашла система, покажем в конце');
+    setVerdict('Режим обучения');
     return;
   }
   const suffix = msg.stub ? ' (заглушка)' : '';
@@ -453,7 +453,11 @@ function sendFocus() {
   if (!socket || socket.readyState !== WebSocket.OPEN) return;
   socket.send(JSON.stringify({ type: 'focus', equipment_id: equipmentId, component: focusSelect.value || null }));
 }
-focusSelect.addEventListener('change', sendFocus);
+focusSelect.addEventListener('change', () => {
+  if (!guiding()) return sendFocus();
+  const index = training.steps.findIndex((step) => step.component === focusSelect.value);
+  goToStep(index >= 0 ? index : training.index);          // "не выбран" is not a step: stay where we are
+});
 
 function setFocus(code) {
   focusSelect.value = code;
@@ -754,13 +758,27 @@ function renderCard(card) {
   history.hidden = card.events.length === 0;
   for (const e of card.events) {
     const hours = e.equipment_hours == null ? '' : ` · при наработке ${num(e.equipment_hours)} ч`;
-    history.append(listItem({
-      lead: EVENT_ICON[e.kind], tone: e.kind === 'defect' ? 'warn' : '',
-      headline: EVENT_TITLE[e.kind] + (e.component_name ? ` · ${e.component_name}` : ''),
+    const title = EVENT_TITLE[e.kind] + (e.component_name ? ` · ${e.component_name}` : '');
+    const item = listItem({
+      lead: EVENT_ICON[e.kind], tone: e.kind === 'defect' ? 'warn' : '', headline: title, as: 'div',
       supporting: [e.note, `${e.created_at.slice(0, 10)}${hours}${e.author ? ` · ${e.author}` : ''}`].filter(Boolean),
       photo: e.photo,
       onClick: e.photo ? () => openPhoto(e.photo, `${e.component_name || 'Агрегат'} · ${e.created_at.slice(0, 10)}`) : undefined,
-    }));
+    });
+    const row = el('li', 'action-row');
+    row.append(item);
+    if (user?.can.edit_history) {
+      row.append(
+        rowButton('edit', `Изменить запись: ${title}`, () => editEvent(e, title)),
+        rowButton('delete', `Удалить запись: ${title}`, act(async () => {
+          const warning = e.kind === 'replacement' ? ' Счётчик ресурса узла при этом не изменится.' : '';
+          if (!window.confirm(`Удалить запись «${title}» от ${e.created_at.slice(0, 10)}?${warning}`)) return;
+          await api(`/api/events/${e.id}/delete`, {});
+          await afterHistoryChange();
+          snack('Запись удалена из истории');
+        })));
+    }
+    history.append(row);
   }
 
   const list = $('components');
@@ -1165,7 +1183,6 @@ function renderTraining() {
   $('live').hidden = guiding();                // the system's findings are revealed after the run
   $('manual-row').hidden = guiding();
   $('shutter').classList.toggle('off', guiding());
-  focusSelect.disabled = guiding();
   drawOverlay();
   if (training.result) renderTrainingResult();
   if (!guiding()) return;
@@ -1173,8 +1190,27 @@ function renderTraining() {
   const step = training.steps[training.index];
   const seen = Boolean(lastDiagnosis?.components[step.component]?.inspected);
   card.replaceChildren();
-  card.append(el('div', 'label-medium', `Шаг ${training.index + 1} из ${training.steps.length}`),
+  const top = el('div', 'step-head');
+  const titles = el('div');
+  titles.append(el('div', 'label-medium', `Шаг ${training.index + 1} из ${training.steps.length}`),
     el('div', 'title-large', step.name));
+  const before = rowButton('chevron_left', 'Предыдущий узел', () => goToStep(training.index - 1));
+  before.disabled = training.index === 0;
+  const after = rowButton('chevron_right', 'Следующий узел', () => goToStep(training.index + 1));
+  after.disabled = training.index === training.steps.length - 1;
+  top.append(titles, before, after);
+  card.append(top);
+  // every node of the unit is a step: a tap goes straight to it
+  const jump = el('div', 'chip-row step-chips');
+  training.steps.forEach((item, index) => {
+    const chip = el('button', 'chip filter', `${index + 1}. ${item.name}`);
+    chip.type = 'button';
+    chip.setAttribute('aria-pressed', String(index === training.index));
+    if (training.answers[item.component]) chip.prepend(icon('check', 'icon small'));
+    chip.addEventListener('click', () => goToStep(index));
+    jump.append(chip);
+  });
+  card.append(jump);
   const progress = el('div', 'progress');
   const fill = el('span');
   fill.style.width = `${((training.index + 1) / training.steps.length) * 100}%`;
@@ -1251,10 +1287,13 @@ function drawTrainingHint(ctx, w, h) {
   const step = training.steps[training.index];
   if (!step) return;
   const m = Math.min(w, h) * 0.12, arm = Math.min(w, h) * 0.1;
+  const foot = document.querySelector('.stage-foot');
+  const top = Math.max(m, 78 + 14);                                   // under the hint box drawn below
+  const bottom = Math.min(h - m, h - (foot ? foot.offsetHeight + 8 : 0) - 14);
   ctx.strokeStyle = '#fff';
   ctx.lineWidth = 3;
   ctx.beginPath();
-  for (const [x, y, dx, dy] of [[m, m, 1, 1], [w - m, m, -1, 1], [m, h - m, 1, -1], [w - m, h - m, -1, -1]]) {
+  for (const [x, y, dx, dy] of [[m, top, 1, 1], [w - m, top, -1, 1], [m, bottom, 1, -1], [w - m, bottom, -1, -1]]) {
     ctx.moveTo(x + dx * arm, y);
     ctx.lineTo(x, y);
     ctx.lineTo(x, y + dy * arm);
@@ -1366,14 +1405,95 @@ $('voice-button').addEventListener('click', listen);
 
 // ---------- sign-in and users ----------
 
+/** A small icon button at the end of a list row. */
+function rowButton(name, label, onClick) {
+  const button = el('button', 'icon-button');
+  button.type = 'button';
+  button.setAttribute('aria-label', label);
+  button.title = label;
+  button.append(icon(name));
+  button.addEventListener('click', onClick);
+  return button;
+}
+
 async function loadUsers() {
   if (!user?.can.manage_users) return;
   const list = $('users');
   list.replaceChildren();
   for (const u of await api('/api/users')) {
-    list.append(listItem({ lead: 'person', headline: u.name, supporting: u.username, trailing: u.role_title }));
+    const row = el('li', 'action-row');
+    row.append(listItem({ lead: 'person', headline: u.name, supporting: `${u.username} · ${u.role_title}`, as: 'div' }),
+      rowButton('edit', `Изменить: ${u.name}`, () => editUser(u)));
+    if (u.username !== user.username) {                   // nobody deletes the account they are signed in with
+      row.append(rowButton('delete', `Удалить: ${u.name}`, act(async () => {
+        if (!window.confirm(`Удалить пользователя «${u.name}» (${u.username})?`)) return;
+        await api(`/api/users/${encodeURIComponent(u.username)}/delete`, {});
+        await loadUsers();
+        snack(`Пользователь удалён: ${u.name}`);
+      })));
+    }
+    list.append(row);
   }
 }
+
+function editUser(u) {
+  const dialog = $('user-dialog');
+  dialog.dataset.username = u.username;
+  $('user-edit-login').textContent = `Логин: ${u.username}`;
+  $('user-edit-name').value = u.name;
+  $('user-edit-role').value = u.role;
+  $('user-edit-password').value = '';
+  $('user-edit-error').hidden = true;
+  dialog.showModal();
+}
+$('user-edit-cancel').addEventListener('click', () => $('user-dialog').close());
+$('user-edit-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const username = $('user-dialog').dataset.username;
+  try {
+    const saved = await api(`/api/users/${encodeURIComponent(username)}`, {
+      name: $('user-edit-name').value, role: $('user-edit-role').value, password: $('user-edit-password').value || null });
+    $('user-dialog').close();
+    if (username === user.username) Object.assign(user, saved);        // the own name in the menu
+    showMode();
+    await loadUsers();
+    snack(`Изменения сохранены: ${saved.name}`);
+  } catch (err) {
+    $('user-edit-error').textContent = err.message;
+    $('user-edit-error').hidden = false;
+  }
+});
+
+// ---------- corrections of the history (administrator) ----------
+
+async function afterHistoryChange() {
+  lastDiagnosisJson = '';
+  await refreshCard();
+  loadUnitStats();
+  pollDiagnosis();
+}
+
+function editEvent(e, title) {
+  const dialog = $('event-dialog');
+  dialog.dataset.id = e.id;
+  $('event-title').textContent = `${title} · ${e.created_at.slice(0, 10)}`;
+  $('event-note').value = e.note || '';
+  $('event-error').hidden = true;
+  dialog.showModal();
+}
+$('event-cancel').addEventListener('click', () => $('event-dialog').close());
+$('event-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  try {
+    await api(`/api/events/${$('event-dialog').dataset.id}`, { note: $('event-note').value });
+    $('event-dialog').close();
+    await afterHistoryChange();
+    snack('Запись истории изменена');
+  } catch (err) {
+    $('event-error').textContent = err.message;
+    $('event-error').hidden = false;
+  }
+});
 
 function signedIn(account) {
   user = account;

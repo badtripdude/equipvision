@@ -19,6 +19,7 @@ PERMISSIONS = {
     "inspect": {"engineer", "master", "admin"},         # record findings, save an inspection
     "register_work": {"master", "admin"},               # maintenance and replacement: they reset resource counters
     "manage_users": {"admin"},
+    "edit_history": {"admin"},                          # correct or remove a saved record
 }
 
 

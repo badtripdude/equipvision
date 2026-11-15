@@ -117,6 +117,56 @@ def users_add(body: UserIn, request: Request):
         raise HTTPException(400, str(exc)) from exc
 
 
+class UserEdit(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    role: Literal["engineer", "master", "admin"]
+    password: str | None = Field(default=None, max_length=200)      # empty: the password stays
+
+
+def _changed(action):
+    """Runs a change of users or history; a missing row is 404, a refused change is 400."""
+    try:
+        return action()
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/users/{username}")
+def users_edit(username: str, body: UserEdit, request: Request):
+    admin = need(request, "manage_users")
+    password = body.password or None
+    if password is not None and len(password) < 8:
+        raise HTTPException(400, "Пароль должен быть не короче 8 символов")
+    return _changed(lambda: db.update_user(username, body.name.strip(), body.role, password, admin["username"]))
+
+
+@app.post("/api/users/{username}/delete")
+def users_delete(username: str, request: Request):
+    admin = need(request, "manage_users")
+    _changed(lambda: db.delete_user(username, admin["username"]))
+    return {"deleted": username}
+
+
+class EventEdit(BaseModel):
+    note: str | None = Field(default=None, max_length=2000)
+
+
+@app.post("/api/events/{event_id}")
+def event_edit(event_id: int, body: EventEdit, request: Request):
+    need(request, "edit_history")
+    return _changed(lambda: db.update_event(event_id, (body.note or "").strip() or None))
+
+
+@app.post("/api/events/{event_id}/delete")
+def event_delete(event_id: int, request: Request):
+    need(request, "edit_history")
+    removed = _changed(lambda: db.delete_event(event_id))
+    photos.delete(removed["photo"])
+    return {"deleted": event_id}
+
+
 # ---------- equipment card ----------
 
 def component_resource(component: dict, equipment_hours: float) -> dict:

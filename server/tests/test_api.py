@@ -91,6 +91,42 @@ class Api(unittest.TestCase):
         fresh = TestClient(app)
         self.assertEqual(fresh.post("/api/login", json={"username": "newcomer", "password": "long-enough-1"}).status_code, 200)
 
+    def test_admin_edits_and_deletes_users(self):
+        admin = self.client("admin")
+        admin.post("/api/users", json={"username": "temp.user", "name": "Временный", "role": "engineer", "password": "long-enough-1"})
+        self.assertEqual(self.client("master").post("/api/users/temp.user", json={"name": "X", "role": "admin"}).status_code, 403)
+
+        edited = admin.post("/api/users/temp.user", json={"name": "Сменный мастер", "role": "master", "password": "another-pass-2"})
+        self.assertEqual((edited.status_code, edited.json()["role_title"]), (200, "мастер"))
+        fresh = TestClient(app)
+        self.assertEqual(fresh.post("/api/login", json={"username": "temp.user", "password": "long-enough-1"}).status_code, 401)
+        self.assertEqual(fresh.post("/api/login", json={"username": "temp.user", "password": "another-pass-2"}).status_code, 200)
+        self.assertEqual(admin.post("/api/users/temp.user", json={"name": "Сменный мастер", "role": "master", "password": "short"}).status_code, 400)
+        self.assertEqual(admin.post("/api/users/nobody", json={"name": "X", "role": "master"}).status_code, 404)
+
+        # the administrator cannot lock everyone out
+        self.assertEqual(admin.post("/api/users/admin", json={"name": "Администратор", "role": "engineer"}).status_code, 400)
+        self.assertEqual(admin.post("/api/users/admin/delete").status_code, 400)
+
+        self.assertEqual(self.client("engineer").post("/api/users/temp.user/delete").status_code, 403)
+        self.assertEqual(admin.post("/api/users/temp.user/delete").status_code, 200)
+        self.assertEqual(fresh.get("/api/me").status_code, 401)                        # the deleted user is signed out
+        self.assertNotIn("temp.user", [u["username"] for u in admin.get("/api/users").json()])
+
+    def test_admin_corrects_and_deletes_history_records(self):
+        master, admin = self.client("master"), self.client("admin")
+        created = master.post("/api/equipment/PCP-1/events", json={"kind": "inspection", "note": "опечатка"}).json()
+        url = f"/api/events/{created['id']}"
+        self.assertEqual(master.post(url, json={"note": "исправлено"}).status_code, 403)
+        self.assertEqual(master.post(url + "/delete").status_code, 403)
+
+        self.assertEqual(admin.post(url, json={"note": "исправлено"}).status_code, 200)
+        notes = {e["id"]: e["note"] for e in admin.get("/api/equipment/PCP-1").json()["events"]}
+        self.assertEqual(notes[created["id"]], "исправлено")
+        self.assertEqual(admin.post(url + "/delete").status_code, 200)
+        self.assertNotIn(created["id"], [e["id"] for e in admin.get("/api/equipment/PCP-1").json()["events"]])
+        self.assertEqual(admin.post(url + "/delete").status_code, 404)
+
     def test_reports(self):
         engineer = self.client("engineer")
         xlsx = engineer.get("/api/equipment/P-101/report.xlsx")

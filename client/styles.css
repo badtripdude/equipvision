@@ -515,3 +515,22 @@ body { overflow-wrap: break-word; }
   .tile-value { font-size: 24px; line-height: 32px; }
   .bar-row { grid-template-columns: minmax(84px, 2fr) 3fr 24px; gap: 8px; }
 }
+
+/* ---------- rows with their own buttons (users, history) ---------- */
+
+.action-row { display: flex; align-items: center; min-width: 0; }
+.action-row > .list-item { flex: 1; min-width: 0; }
+.action-row > .icon-button { flex: none; width: 44px; height: 44px; }
+.action-row > .icon-button:last-child { margin-right: 4px; }
+.field.area textarea { width: 100%; padding: 16px; border: 1px solid var(--md-outline); border-radius: var(--md-shape-xs);
+                       background: transparent; color: var(--md-on-surface); resize: vertical;
+                       font: 400 16px/24px Roboto, "Segoe UI", sans-serif; letter-spacing: .5px; }
+.field.area textarea:focus { outline: none; border: 2px solid var(--md-primary); padding: 15px; }
+.dialog .field input::placeholder { color: var(--md-on-surface-variant); opacity: .8; font-size: 14px; }
+
+/* ---------- trainee mode: step header and jump to any node ---------- */
+
+.step-head { display: flex; align-items: center; gap: 4px; }
+.step-head > div { flex: 1; min-width: 0; }
+.training .icon-button { color: inherit; }
+.step-chips { margin: 0 -4px; padding: 0 4px 4px; }

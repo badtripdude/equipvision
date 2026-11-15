@@ -388,6 +388,58 @@ def add_user(username: str, name: str, role: str, password: str) -> dict:
     return {"username": username, "name": name, "role": role, "role_title": auth.ROLES[role]}
 
 
+def update_user(username: str, name: str, role: str, password: str | None, actor: str) -> dict:
+    """Change the name, the role and, if given, the password. The last administrator keeps the role."""
+    with connect() as conn:
+        row = conn.execute("SELECT * FROM user WHERE username = ?", (username,)).fetchone()
+        if row is None:
+            raise LookupError("Пользователь не найден")
+        if row["role"] == "admin" and role != "admin":
+            if username == actor:
+                raise ValueError("Нельзя снять роль администратора с самого себя")
+            if conn.execute("SELECT COUNT(*) FROM user WHERE role = 'admin'").fetchone()[0] <= 1:
+                raise ValueError("В системе должен остаться хотя бы один администратор")
+        conn.execute("UPDATE user SET name = ?, role = ? WHERE username = ?", (name, role, username))
+        if password:
+            conn.execute("UPDATE user SET password_hash = ? WHERE username = ?", (auth.hash_password(password), username))
+            if username != actor:                          # a new password signs the person out everywhere
+                conn.execute("DELETE FROM session WHERE username = ?", (username,))
+    return {"username": username, "name": name, "role": role, "role_title": auth.ROLES[role]}
+
+
+def delete_user(username: str, actor: str) -> None:
+    with connect() as conn:
+        row = conn.execute("SELECT * FROM user WHERE username = ?", (username,)).fetchone()
+        if row is None:
+            raise LookupError("Пользователь не найден")
+        if username == actor:
+            raise ValueError("Нельзя удалить собственную учётную запись")
+        if row["role"] == "admin" and conn.execute("SELECT COUNT(*) FROM user WHERE role = 'admin'").fetchone()[0] <= 1:
+            raise ValueError("В системе должен остаться хотя бы один администратор")
+        conn.execute("DELETE FROM session WHERE username = ?", (username,))
+        conn.execute("DELETE FROM user WHERE username = ?", (username,))
+
+
+# ---------- corrections of the history ----------
+
+def update_event(event_id: int, note: str | None) -> dict:
+    with connect() as conn:
+        if conn.execute("SELECT 1 FROM event WHERE id = ?", (event_id,)).fetchone() is None:
+            raise LookupError("Запись не найдена")
+        conn.execute("UPDATE event SET note = ? WHERE id = ?", (note, event_id))
+    return {"id": event_id, "note": note}
+
+
+def delete_event(event_id: int) -> dict:
+    """Removes the record and returns it, so the caller can delete its photo."""
+    with connect() as conn:
+        row = conn.execute("SELECT * FROM event WHERE id = ?", (event_id,)).fetchone()
+        if row is None:
+            raise LookupError("Запись не найдена")
+        conn.execute("DELETE FROM event WHERE id = ?", (event_id,))
+    return dict(row)
+
+
 # ---------- defect statistics ----------
 
 def stats(equipment_id: str | None = None) -> dict:
